@@ -44,13 +44,14 @@ class Cloudshark(object):
             raise CloudsharkError('Error retrieving: %s'%url,http_status)
         return json.loads(content)
 
-    def upload(self,file_object):
+    def upload(self,file_object,file_name=None):
         """Upload a capture file to Cloudshark."""
         url = '%s/api/v1/%s/upload' % (self.url,self.token)
         BOUNDARY = "LANDSHARKCLOUDSHARK"
         headers = {}
         headers['Content-Type'] = 'multipart/form-data; boundary=%s' % BOUNDARY
-        file_name = os.path.basename(file_object.name)
+        if file_name is None:
+            file_name = os.path.basename(file_object.name)
         file_content = file_object.read()
         body_lines = ['--' + BOUNDARY,
                 'Content-Disposition: form-data; name="file"; filename="%s"' % file_name,
