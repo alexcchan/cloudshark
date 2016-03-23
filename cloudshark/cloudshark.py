@@ -18,14 +18,15 @@ class CloudsharkError(Exception):
 
 class Cloudshark(object):
 
-    def __init__(self,url,token):
+    def __init__(self,url,token,client_args={}):
         self.url = url
         self.token = token
+        self.client_args = client_args
 
     def get_info(self,id):
         """Get the info about a particular capture by id."""
         url = '%s/api/v1/%s/info/%s' % (self.url,self.token,id)
-        http = httplib2.Http()
+        http = httplib2.Http(**self.client_args)
         (response,content) = http.request(url,method='GET')
         http_status = response.get('status')
         if http_status != '200':
@@ -36,7 +37,7 @@ class Cloudshark(object):
     def search_by_file_name(self,file_name):
         """Search for a capture by file name."""
         url = '%s/api/v1/%s/search?search[filename]=%s' % (self.url,self.token,urllib.quote(file_name))
-        http = httplib2.Http()
+        http = httplib2.Http(**self.client_args)
         (response,content) = http.request(url,method='GET')
         http_status = response.get('status')
         if http_status != '200':
@@ -44,7 +45,7 @@ class Cloudshark(object):
             raise CloudsharkError('Error retrieving: %s'%url,http_status)
         return json.loads(content)
 
-    def upload(self,file_object,file_name=None):
+    def upload(self,file_object,file_name=None,additional_tags=None,comments=None):
         """Upload a capture file to Cloudshark."""
         url = '%s/api/v1/%s/upload' % (self.url,self.token)
         BOUNDARY = "LANDSHARKCLOUDSHARK"
@@ -57,8 +58,20 @@ class Cloudshark(object):
                 'Content-Disposition: form-data; name="file"; filename="%s"' % file_name,
                 'Content-Type: application/octet-stream',
                 '',
-                file_content,
-                '--' + BOUNDARY + '--',
+                file_content]
+        if additional_tags is not None:
+            body_lines += ['--' + BOUNDARY,
+                'Content-Disposition: form-data; name="additional_tags"',
+                'Content-Type: text/plain',
+                '',
+                ','.join(additional_tags)]
+        if comments is not None:
+            body_lines += ['--' + BOUNDARY,
+                'Content-Disposition: form-data; name="comments"',
+                'Content-Type: text/plain',
+                '',
+                comments]
+        body_lines += ['--' + BOUNDARY + '--',
                 '']
         b = io.BytesIO()
         for body_line in body_lines:
@@ -68,7 +81,7 @@ class Cloudshark(object):
                 b.write(body_line)
             b.write(b'\r\n')
         body = b.getvalue()
-        http = httplib2.Http()
+        http = httplib2.Http(**self.client_args)
         (response,content) = http.request(url,method='POST',body=body,headers=headers)
         http_status = response.get('status')
         if http_status != '200':
